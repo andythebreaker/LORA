@@ -1,4 +1,12 @@
 {
+  "name": "MSAVT",
+  "version": "0.0.2",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "andythebreaker",
+  "license": "MIT",
+  "description": "A simple Node.js application",
   "dependencies": {
     "@ngrok/ngrok": "^1.2.0",
     "gmail-send": "^1.8.14"
