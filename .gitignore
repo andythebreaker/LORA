@@ -1,0 +1,8 @@
+WinSW-x64.out.log
+WinSW-x64.wrapper.log
+node_modules/
+package-lock.json
+WinSW-x64.err.log
+WinSW-x64.xml
+WinSW-x64.exe
+mediamtx.exe
