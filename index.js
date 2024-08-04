@@ -24,7 +24,7 @@ fs.readFile('env.json', 'utf8')
                             http.createServer((req, res) => {
                                 res.writeHead(200, { 'Content-Type': 'text/html' });
                                 res.end(
-                                    indexHtmlData
+                                    indexHtmlData.replace("${listener.url()}",listener.url())
                                 );
                             }).listen(15418, () => console.log('Node.js web server at 15418 is running...'));
 
