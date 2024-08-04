@@ -233,7 +233,7 @@
                 medias: [],
             };
 
-            for (const line of offer.split('\\r\\n')) {
+            for (const line of offer.split('\r\n')) {
                 if (line.startsWith('m=')) {
                     ret.medias.push(line.slice('m='.length));
                 } else if (ret.iceUfrag === '' && line.startsWith('a=ice-ufrag:')) {
@@ -248,7 +248,7 @@
 
         const enableStereoOpus2 = (section) => {
             let opusPayloadFormat = '';
-            let lines = section.split('\\r\\n');
+            let lines = section.split('\r\n');
 
             for (let i = 0; i < lines.length; i++) {
                 if (lines[i].startsWith('a=rtpmap:') && lines[i].toLowerCase().includes('opus/')) {
@@ -272,7 +272,7 @@
                 }
             }
 
-            return lines.join('\\r\\n');
+            return lines.join('\r\n');
         };
 
         const editOffer2 = (offer) => {
@@ -298,18 +298,18 @@
                 candidatesByMedia[mid].push(candidate);
             }
 
-            let frag = 'a=ice-ufrag:' + od.iceUfrag + '\\r\\n'
-                + 'a=ice-pwd:' + od.icePwd + '\\r\\n';
+            let frag = 'a=ice-ufrag:' + od.iceUfrag + '\r\n'
+                + 'a=ice-pwd:' + od.icePwd + '\r\n';
 
             let mid = 0;
 
             for (const media of od.medias) {
                 if (candidatesByMedia[mid] !== undefined) {
-                    frag += 'm=' + media + '\\r\\n'
-                        + 'a=mid:' + mid + '\\r\\n';
+                    frag += 'm=' + media + '\r\n'
+                        + 'a=mid:' + mid + '\r\n';
 
                     for (const candidate of candidatesByMedia[mid]) {
-                        frag += 'a=' + candidate.candidate + '\\r\\n';
+                        frag += 'a=' + candidate.candidate + '\r\n';
                     }
                 }
                 mid++;
@@ -589,7 +589,7 @@
                 medias: [],
             };
 
-            for (const line of offer.split('\\r\\n')) {
+            for (const line of offer.split('\r\n')) {
                 if (line.startsWith('m=')) {
                     ret.medias.push(line.slice('m='.length));
                 } else if (ret.iceUfrag === '' && line.startsWith('a=ice-ufrag:')) {
@@ -612,18 +612,18 @@
                 candidatesByMedia[mid].push(candidate);
             }
 
-            let frag = 'a=ice-ufrag:' + od.iceUfrag + '\\r\\n'
-                + 'a=ice-pwd:' + od.icePwd + '\\r\\n';
+            let frag = 'a=ice-ufrag:' + od.iceUfrag + '\r\n'
+                + 'a=ice-pwd:' + od.icePwd + '\r\n';
 
             let mid = 0;
 
             for (const media of od.medias) {
                 if (candidatesByMedia[mid] !== undefined) {
-                    frag += 'm=' + media + '\\r\\n'
-                        + 'a=mid:' + mid + '\\r\\n';
+                    frag += 'm=' + media + '\r\n'
+                        + 'a=mid:' + mid + '\r\n';
 
                     for (const candidate of candidatesByMedia[mid]) {
-                        frag += 'a=' + candidate.candidate + '\\r\\n';
+                        frag += 'a=' + candidate.candidate + '\r\n';
                     }
                 }
                 mid++;
@@ -633,7 +633,7 @@
         };
 
         const setCodec = (section, codec) => {
-            const lines = section.split('\\r\\n');
+            const lines = section.split('\r\n');
             const lines2 = [];
             const payloadFormats = [];
 
@@ -668,11 +668,11 @@
                 }
             }
 
-            return lines3.join('\\r\\n');
+            return lines3.join('\r\n');
         };
 
         const setVideoBitrate = (section, bitrate) => {
-            let lines = section.split('\\r\\n');
+            let lines = section.split('\r\n');
 
             for (let i = 0; i < lines.length; i++) {
                 if (lines[i].startsWith('c=')) {
@@ -681,12 +681,12 @@
                 }
             }
 
-            return lines.join('\\r\\n');
+            return lines.join('\r\n');
         };
 
         const setAudioBitrate = (section, bitrate, voice) => {
             let opusPayloadFormat = '';
-            let lines = section.split('\\r\\n');
+            let lines = section.split('\r\n');
 
             for (let i = 0; i < lines.length; i++) {
                 if (lines[i].startsWith('a=rtpmap:') && lines[i].toLowerCase().includes('opus/')) {
@@ -711,7 +711,7 @@
                 }
             }
 
-            return lines.join('\\r\\n');
+            return lines.join('\r\n');
         };
 
         const editOffer = (sdp) => {
