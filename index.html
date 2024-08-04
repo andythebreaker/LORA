@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'Arial', sans-serif;
+        }
+
+        #video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgb(30, 30, 30);
+        }
+
+        #controls {
+            display: none;
+            flex-shrink: 0;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            flex-direction: column;
+            min-height: 100%;
+            width: 100%;
+            box-sizing: border-box;
+            background: rgb(30, 30, 30);
+            color: white;
+        }
+
+        .item {
+            display: grid;
+            grid-auto-flow: column;
+            grid-template-columns: auto 220px;
+            align-items: center;
+            gap: 20px;
+            max-width: 500px;
+            margin: 10px 0;
+        }
+
+        select,
+        input[type="text"] {
+            appearance: none;
+            background: inherit;
+            color: inherit;
+            border: 1px solid rgb(200, 200, 200);
+            border-radius: 3px;
+            height: 40px;
+            padding: 0 10px;
+        }
+
+        select option {
+            color: black;
+        }
+
+        #message {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            text-align: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            pointer-events: none;
+            padding: 20px;
+            box-sizing: border-box;
+            text-shadow: 0 0 5px black;
+        }
+
+        #publish-button {
+            margin-top: 10px;
+            appearance: none;
+            background: rgb(200, 200, 200);
+            color: black;
+            border-radius: 3px;
+            height: 50px;
+            padding: 0 20px;
+            border: none;
+        }
+
+        .splitUpDown1,
+        .splitUpDown2 {
+            height: 50%;
+            width: 100%;
+            position: relative;
+        }
+
+        .splitUpDown2 {
+            top: 50%;
+            background-color: lightgray;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="splitUpDown1">
+        <video id="video" muted autoplay playsinline></video>
+
+        <div id="controls">
+            <div id="items">
+                <div class="item">
+                    <label for="video-device">video device</label>
+                    <select id="video-device">
+                        <option value="none">none</option>
+                    </select>
+                </div>
+
+                <div class="item">
+                    <label for="video-codec">video codec</label>
+                    <select id="video-codec">
+                    </select>
+                </div>
+
+                <div class="item">
+                    <label for="video-bitrate">video bitrate (kbps)</label>
+                    <input id="video-bitrate" type="text" value="10000" />
+                </div>
+
+                <div class="item">
+                    <label for="video-framerate">video framerate (ideal)</label>
+                    <input id="video-framerate" type="text" value="30" />
+                </div>
+
+                <div class="item">
+                    <label for="video-width">video width (ideal)</label>
+                    <input id="video-width" type="text" value="1920" />
+                </div>
+
+                <div class="item">
+                    <label for="video-height">video height (ideal)</label>
+                    <input id="video-height" type="text" value="1080" />
+                </div>
+
+                <div class="item">
+                    <label for="audio-device">audio device</label>
+                    <select id="audio-device">
+                        <option value="none">none</option>
+                    </select>
+                </div>
+
+                <div class="item">
+                    <label for="audio-codec">audio codec</label>
+                    <select id="audio-codec">
+                    </select>
+                </div>
+
+                <div class="item">
+                    <label for="audio-bitrate">audio bitrate (kbps)</label>
+                    <input id="audio-bitrate" type="text" value="32" />
+                </div>
+
+                <div class="item">
+                    <label for="audio-voice">optimize for voice</label>
+                    <div>
+                        <input id="audio-voice" type="checkbox" checked>
+                    </div>
+                </div>
+            </div>
+
+            <div id="submit-line">
+                <button id="publish-button">publish</button>
+            </div>
+        </div>
+
+        <div id="message"></div>
+    </div>
+
+    <div class="splitUpDown2">
+        <video style="transform: scale(10);" id="video2"></video>
+        <div id="message2"></div>
+    </div>
+
+    <script>
+
+        const video2 = document.getElementById('video2');
+        const message2 = document.getElementById('message2');
+
+        let pc2 = null;
+        let restartTimeout2 = null;
+        let sessionUrl2 = '';
+        let offerData2 = '';
+        let queuedCandidates2 = [];
+        let defaultControls2 = false;
+
+        const setMessage2 = (str) => {
+            if (str !== '') {
+                video2.controls = false;
+            } else {
+                video2.controls = defaultControls2;
+            }
+            message2.innerText = str;
+        };
+
+        const unquoteCredential2 = (v) => (
+            JSON.parse('"' + String(v) + '"')
+        );
+
+        const linkToIceServers2 = (links) => (
+            (links !== null) ? links.split(', ').map((link) => {
+                const m = link.match(/^<(.+?)>; rel="ice-server"(; username="(.*?)"; credential="(.*?)"; credential-type="password")?/i);
+                const ret = {
+                    urls: [m[1]],
+                };
+
+                if (m[3] !== undefined) {
+                    ret.username = unquoteCredential2(m[3]);
+                    ret.credential = unquoteCredential2(m[4]);
+                    ret.credentialType = 'password';
+                }
+
+                return ret;
+            }) : []
+        );
+
+        const parseOffer2 = (offer) => {
+            const ret = {
+                iceUfrag: '',
+                icePwd: '',
+                medias: [],
+            };
+
+            for (const line of offer.split('\\r\\n')) {
+                if (line.startsWith('m=')) {
+                    ret.medias.push(line.slice('m='.length));
+                } else if (ret.iceUfrag === '' && line.startsWith('a=ice-ufrag:')) {
+                    ret.iceUfrag = line.slice('a=ice-ufrag:'.length);
+                } else if (ret.icePwd === '' && line.startsWith('a=ice-pwd:')) {
+                    ret.icePwd = line.slice('a=ice-pwd:'.length);
+                }
+            }
+
+            return ret;
+        };
+
+        const enableStereoOpus2 = (section) => {
+            let opusPayloadFormat = '';
+            let lines = section.split('\\r\\n');
+
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].startsWith('a=rtpmap:') && lines[i].toLowerCase().includes('opus/')) {
+                    opusPayloadFormat = lines[i].slice('a=rtpmap:'.length).split(' ')[0];
+                    break;
+                }
+            }
+
+            if (opusPayloadFormat === '') {
+                return section;
+            }
+
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].startsWith('a=fmtp:' + opusPayloadFormat + ' ')) {
+                    if (!lines[i].includes('stereo')) {
+                        lines[i] += ';stereo=1';
+                    }
+                    if (!lines[i].includes('sprop-stereo')) {
+                        lines[i] += ';sprop-stereo=1';
+                    }
+                }
+            }
+
+            return lines.join('\\r\\n');
+        };
+
+        const editOffer2 = (offer) => {
+            const sections = offer.sdp.split('m=');
+
+            for (let i = 0; i < sections.length; i++) {
+                const section = sections[i];
+                if (section.startsWith('audio')) {
+                    sections[i] = enableStereoOpus2(section);
+                }
+            }
+
+            offer.sdp = sections.join('m=');
+        };
+
+        const generateSdpFragment2 = (od, candidates) => {
+            const candidatesByMedia = {};
+            for (const candidate of candidates) {
+                const mid = candidate.sdpMLineIndex;
+                if (candidatesByMedia[mid] === undefined) {
+                    candidatesByMedia[mid] = [];
+                }
+                candidatesByMedia[mid].push(candidate);
+            }
+
+            let frag = 'a=ice-ufrag:' + od.iceUfrag + '\\r\\n'
+                + 'a=ice-pwd:' + od.icePwd + '\\r\\n';
+
+            let mid = 0;
+
+            for (const media of od.medias) {
+                if (candidatesByMedia[mid] !== undefined) {
+                    frag += 'm=' + media + '\\r\\n'
+                        + 'a=mid:' + mid + '\\r\\n';
+
+                    for (const candidate of candidatesByMedia[mid]) {
+                        frag += 'a=' + candidate.candidate + '\\r\\n';
+                    }
+                }
+                mid++;
+            }
+
+            return frag;
+        };
+
+        const loadStream2 = () => {
+            requestICEServers2();
+        };
+
+        const onError2 = (err) => {
+            if (restartTimeout2 === null) {
+                setMessage2(err + ', retrying in some seconds');
+
+                if (pc2 !== null) {
+                    pc2.close();
+                    pc2 = null;
+                }
+
+                restartTimeout2 = window.setTimeout(() => {
+                    restartTimeout2 = null;
+                    loadStream2();
+                }, retryPause);
+
+                if (sessionUrl2) {
+                    fetch(sessionUrl2, {
+                        method: 'DELETE',
+                    });
+                }
+                sessionUrl2 = '';
+
+                queuedCandidates2 = [];
+            }
+        };
+
+        const sendLocalCandidates2 = (candidates) => {
+            fetch(sessionUrl2 + window.location.search, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/trickle-ice-sdpfrag',
+                    'If-Match': '*',
+                },
+                body: generateSdpFragment2(offerData2, candidates),
+            })
+                .then((res) => {
+                    switch (res.status) {
+                        case 204:
+                            break;
+                        case 404:
+                            throw new Error('stream not found');
+                        default:
+                            throw new Error('bad status code ' + String(res.status));
+                    }
+                })
+                .catch((err) => {
+                    onError2(err.toString());
+                });
+        };
+
+        const onLocalCandidate2 = (evt) => {
+            if (restartTimeout2 !== null) {
+                return;
+            }
+
+            if (evt.candidate !== null) {
+                if (sessionUrl2 === '') {
+                    queuedCandidates2.push(evt.candidate);
+                } else {
+                    sendLocalCandidates2([evt.candidate])
+                }
+            }
+        };
+
+        const onRemoteAnswer2 = (sdp) => {
+            if (restartTimeout2 !== null) {
+                return;
+            }
+
+            pc2.setRemoteDescription(new RTCSessionDescription({
+                type: 'answer',
+                sdp,
+            }));
+
+            if (queuedCandidates2.length !== 0) {
+                sendLocalCandidates2(queuedCandidates2);
+                queuedCandidates2 = [];
+            }
+        };
+
+        const sendOffer2 = (offer) => {
+            fetch(new URL('whep', changePort('srv2cli', false)) + window.location.search, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/sdp',
+                },
+                body: offer.sdp,
+            })
+                .then((res) => {
+                    switch (res.status) {
+                        case 201:
+                            break;
+                        case 404:
+                            throw new Error('stream not found');
+                        default:
+                            throw new Error('bad status code ' + String(res.status));
+                    }
+                    sessionUrl2 = new URL(res.headers.get('location'), changePort('srv2cli', false)).toString();
+                    return res.text();
+                })
+                .then((sdp) => onRemoteAnswer2(sdp))
+                .catch((err) => {
+                    onError2(err.toString());
+                });
+        };
+
+        const createOffer2 = () => {
+            pc2.createOffer()
+                .then((offer) => {
+                    editOffer2(offer);
+                    offerData2 = parseOffer2(offer.sdp);
+                    pc2.setLocalDescription(offer);
+                    sendOffer2(offer);
+                });
+        };
+
+        const onConnectionState2 = () => {
+            if (restartTimeout2 !== null) {
+                return;
+            }
+
+            if (pc2.iceConnectionState === 'disconnected') {
+                onError2('peer connection disconnected');
+            }
+        };
+
+        const onTrack2 = (evt) => {
+            setMessage2('');
+            video2.srcObject = evt.streams[0];
+        };
+
+        const requestICEServers2 = () => {
+            fetch(new URL('whep', changePort('srv2cli', false)) + window.location.search, {
+                method: 'OPTIONS',
+            })
+                .then((res) => {
+                    pc2 = new RTCPeerConnection({
+                        iceServers: linkToIceServers2(res.headers.get('Link')),
+                        sdpSemantics: 'unified-plan',
+                    });
+
+                    const direction = 'sendrecv';
+                    pc2.addTransceiver('video', { direction });
+                    pc2.addTransceiver('audio', { direction });
+
+                    pc2.onicecandidate = (evt) => onLocalCandidate2(evt);
+                    pc2.oniceconnectionstatechange = () => onConnectionState2();
+                    pc2.ontrack = (evt) => onTrack2(evt);
+
+                    createOffer2();
+                })
+                .catch((err) => {
+                    onError2(err.toString());
+                });
+        };
+
+        const parseBoolString2 = (str, defaultVal) => {
+            str = (str || '');
+
+            if (['1', 'yes', 'true'].includes(str.toLowerCase())) {
+                return true;
+            }
+            if (['0', 'no', 'false'].includes(str.toLowerCase())) {
+                return false;
+            }
+            return defaultVal;
+        };
+
+        const loadAttributesFromQuery2 = () => {
+            const params = new URLSearchParams(window.location.search);
+            video2.controls = parseBoolString2(params.get('controls'), true);
+            video2.muted = parseBoolString2(params.get('muted'), true);
+            video2.autoplay = parseBoolString2(params.get('autoplay'), true);
+            video2.playsInline = parseBoolString2(params.get('playsinline'), true);
+            defaultControls2 = video2.controls;
+        };
+
+        const retryPause = 2000;
+
+        const video = document.getElementById('video');
+        const controls = document.getElementById('controls');
+        const message = document.getElementById('message');
+        const publishButton = document.getElementById('publish-button');
+
+        const videoForm = {
+            device: document.getElementById('video-device'),
+            codec: document.getElementById('video-codec'),
+            bitrate: document.getElementById('video-bitrate'),
+            framerate: document.getElementById('video-framerate'),
+            width: document.getElementById('video-width'),
+            height: document.getElementById('video-height')
+        };
+
+        const audioForm = {
+            device: document.getElementById('audio-device'),
+            codec: document.getElementById('audio-codec'),
+            bitrate: document.getElementById('audio-bitrate'),
+            voice: document.getElementById('audio-voice'),
+        };
+
+        let pc = null;
+        let stream = null;
+        let restartTimeout = null;
+        let sessionUrl = '';
+        let offerData = '';
+        let queuedCandidates = [];
+
+        const setMessage = (str) => {
+            message.innerText = str;
+        };
+
+        const onError = (err, retry) => {
+            if (!retry) {
+                setMessage(err);
+            } else {
+                if (restartTimeout === null) {
+                    setMessage(err + ', retrying in some seconds');
+
+                    if (pc !== null) {
+                        pc.close();
+                        pc = null;
+                    }
+
+                    restartTimeout = window.setTimeout(() => {
+                        restartTimeout = null;
+                        startTransmit();
+                    }, retryPause);
+
+                    if (sessionUrl) {
+                        fetch(sessionUrl, {
+                            method: 'DELETE',
+                        });
+                    }
+                    sessionUrl = '';
+
+                    queuedCandidates = [];
+                }
+            }
+        };
+
+        const unquoteCredential = (v) => (
+            JSON.parse('"' + String(v) + '"')
+        );
+
+        const linkToIceServers = (links) => (
+            (links !== null) ? links.split(', ').map((link) => {
+                const m = link.match(/^<(.+?)>; rel="ice-server"(; username="(.*?)"; credential="(.*?)"; credential-type="password")?/i);
+                const ret = {
+                    urls: [m[1]],
+                };
+
+                if (m[3] !== undefined) {
+                    ret.username = unquoteCredential(m[3]);
+                    ret.credential = unquoteCredential(m[4]);
+                    ret.credentialType = 'password';
+                }
+
+                return ret;
+            }) : []
+        );
+
+        const parseOffer = (offer) => {
+            const ret = {
+                iceUfrag: '',
+                icePwd: '',
+                medias: [],
+            };
+
+            for (const line of offer.split('\\r\\n')) {
+                if (line.startsWith('m=')) {
+                    ret.medias.push(line.slice('m='.length));
+                } else if (ret.iceUfrag === '' && line.startsWith('a=ice-ufrag:')) {
+                    ret.iceUfrag = line.slice('a=ice-ufrag:'.length);
+                } else if (ret.icePwd === '' && line.startsWith('a=ice-pwd:')) {
+                    ret.icePwd = line.slice('a=ice-pwd:'.length);
+                }
+            }
+
+            return ret;
+        };
+
+        const generateSdpFragment = (od, candidates) => {
+            const candidatesByMedia = {};
+            for (const candidate of candidates) {
+                const mid = candidate.sdpMLineIndex;
+                if (candidatesByMedia[mid] === undefined) {
+                    candidatesByMedia[mid] = [];
+                }
+                candidatesByMedia[mid].push(candidate);
+            }
+
+            let frag = 'a=ice-ufrag:' + od.iceUfrag + '\\r\\n'
+                + 'a=ice-pwd:' + od.icePwd + '\\r\\n';
+
+            let mid = 0;
+
+            for (const media of od.medias) {
+                if (candidatesByMedia[mid] !== undefined) {
+                    frag += 'm=' + media + '\\r\\n'
+                        + 'a=mid:' + mid + '\\r\\n';
+
+                    for (const candidate of candidatesByMedia[mid]) {
+                        frag += 'a=' + candidate.candidate + '\\r\\n';
+                    }
+                }
+                mid++;
+            }
+
+            return frag;
+        };
+
+        const setCodec = (section, codec) => {
+            const lines = section.split('\\r\\n');
+            const lines2 = [];
+            const payloadFormats = [];
+
+            for (const line of lines) {
+                if (!line.startsWith('a=rtpmap:')) {
+                    lines2.push(line);
+                } else {
+                    if (line.toLowerCase().includes(codec)) {
+                        payloadFormats.push(line.slice('a=rtpmap:'.length).split(' ')[0]);
+                        lines2.push(line);
+                    }
+                }
+            }
+
+            const lines3 = [];
+            let firstLine = true;
+
+            for (const line of lines2) {
+                if (firstLine) {
+                    firstLine = false;
+                    lines3.push(line.split(' ').slice(0, 3).concat(payloadFormats).join(' '));
+                } else if (line.startsWith('a=fmtp:')) {
+                    if (payloadFormats.includes(line.slice('a=fmtp:'.length).split(' ')[0])) {
+                        lines3.push(line);
+                    }
+                } else if (line.startsWith('a=rtcp-fb:')) {
+                    if (payloadFormats.includes(line.slice('a=rtcp-fb:'.length).split(' ')[0])) {
+                        lines3.push(line);
+                    }
+                } else {
+                    lines3.push(line);
+                }
+            }
+
+            return lines3.join('\\r\\n');
+        };
+
+        const setVideoBitrate = (section, bitrate) => {
+            let lines = section.split('\\r\\n');
+
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].startsWith('c=')) {
+                    lines = [...lines.slice(0, i + 1), 'b=TIAS:' + (parseInt(bitrate) * 1024).toString(), ...lines.slice(i + 1)];
+                    break
+                }
+            }
+
+            return lines.join('\\r\\n');
+        };
+
+        const setAudioBitrate = (section, bitrate, voice) => {
+            let opusPayloadFormat = '';
+            let lines = section.split('\\r\\n');
+
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].startsWith('a=rtpmap:') && lines[i].toLowerCase().includes('opus/')) {
+                    opusPayloadFormat = lines[i].slice('a=rtpmap:'.length).split(' ')[0];
+                    break;
+                }
+            }
+
+            if (opusPayloadFormat === '') {
+                return section;
+            }
+
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].startsWith('a=fmtp:' + opusPayloadFormat + ' ')) {
+                    if (voice) {
+                        lines[i] = 'a=fmtp:' + opusPayloadFormat + ' minptime=10;useinbandfec=1;maxaveragebitrate='
+                            + (parseInt(bitrate) * 1024).toString();
+                    } else {
+                        lines[i] = 'a=fmtp:' + opusPayloadFormat + ' maxplaybackrate=48000;stereo=1;sprop-stereo=1;maxaveragebitrate='
+                            + (parseInt(bitrate) * 1024).toString();
+                    }
+                }
+            }
+
+            return lines.join('\\r\\n');
+        };
+
+        const editOffer = (sdp) => {
+            const sections = sdp.split('m=');
+
+            for (let i = 0; i < sections.length; i++) {
+                const section = sections[i];
+                if (section.startsWith('video')) {
+                    sections[i] = setCodec(section, videoForm.codec.value);
+                } else if (section.startsWith('audio')) {
+                    sections[i] = setAudioBitrate(setCodec(section, audioForm.codec.value), audioForm.bitrate.value, audioForm.voice.checked);
+                }
+            }
+
+            return sections.join('m=');
+        };
+
+        const editAnswer = (sdp) => {
+            const sections = sdp.split('m=');
+
+            for (let i = 0; i < sections.length; i++) {
+                const section = sections[i];
+                if (section.startsWith('video')) {
+                    sections[i] = setVideoBitrate(section, videoForm.bitrate.value);
+                }
+            }
+
+            return sections.join('m=');
+        };
+
+        const sendLocalCandidates = (candidates) => {
+            fetch(sessionUrl + window.location.search, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/trickle-ice-sdpfrag',
+                    'If-Match': '*',
+                },
+                body: generateSdpFragment(offerData, candidates),
+            })
+                .then((res) => {
+                    if (res.status !== 204) {
+                        throw new Error('bad status code');
+                    }
+                })
+                .catch((err) => {
+                    onError(err.toString(), true);
+                });
+        };
+
+        const onLocalCandidate = (evt) => {
+            if (restartTimeout !== null) {
+                return;
+            }
+
+            if (evt.candidate !== null) {
+                if (sessionUrl === '') {
+                    queuedCandidates.push(evt.candidate);
+                } else {
+                    sendLocalCandidates([evt.candidate])
+                }
+            }
+        };
+
+        const onRemoteAnswer = (sdp) => {
+            if (restartTimeout !== null) {
+                return;
+            }
+
+            sdp = editAnswer(sdp);
+
+            pc.setRemoteDescription(new RTCSessionDescription({
+                type: 'answer',
+                sdp,
+            }));
+
+            if (queuedCandidates.length !== 0) {
+                sendLocalCandidates(queuedCandidates);
+                queuedCandidates = [];
+            }
+        };
+
+        const changePort = (stringKeyword, YESORNOpublish) => {
+            var stuff2return = '${listener.url()}/' + String(stringKeyword) + '/' + String(YESORNOpublish ? 'publish' : '');
+            return stuff2return;
+        }
+
+        const sendOffer = (offer) => {
+            offer = editOffer(offer);
+
+            fetch(new URL('whip', changePort('cli2srv', true)) + window.location.search, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/sdp',
+                },
+                body: offer,
+            })
+                .then((res) => {
+                    if (res.status !== 201) {
+                        throw new Error('bad status code');
+                    }
+                    sessionUrl = new URL(res.headers.get('location'), changePort('cli2srv', true)).toString();
+                    return res.text();
+                })
+                .then((answer) => onRemoteAnswer(answer))
+                .catch((err) => {
+                    onError(err.toString(), true);
+                });
+        };
+
+        const createOffer = () => {
+            pc.createOffer()
+                .then((offer) => {
+                    offerData = parseOffer(offer.sdp);
+                    pc.setLocalDescription(offer);
+                    sendOffer(offer.sdp);
+                });
+        };
+
+        const onConnectionState = () => {
+            if (restartTimeout !== null) {
+                return;
+            }
+
+            if (pc.iceConnectionState === 'disconnected') {
+                onError('peer connection disconnected', true);
+            } else if (pc.iceConnectionState === 'connected') {
+                setMessage('');
+            }
+        };
+
+        const requestICEServers = () => {
+            fetch(new URL('whip', changePort('cli2srv', true)) + window.location.search, {
+                method: 'OPTIONS',
+            })
+                .then((res) => {
+                    pc = new RTCPeerConnection({
+                        iceServers: linkToIceServers(res.headers.get('Link')),
+                        sdpSemantics: 'unified-plan',
+                    });
+
+                    pc.onicecandidate = (evt) => onLocalCandidate(evt);
+                    pc.oniceconnectionstatechange = () => onConnectionState();
+
+                    stream.getTracks().forEach((track) => {
+                        pc.addTrack(track, stream);
+                    });
+
+                    createOffer();
+                })
+                .catch((err) => {
+                    onError(err.toString(), true);
+                });
+        };
+
+        const startTransmit = () => {
+            requestICEServers();
+        };
+
+        const onPublish = () => {
+            controls.style.display = 'none';
+            video.style.display = 'block';
+            setMessage('connecting');
+
+            const videoId = videoForm.device.value;
+            const audioId = audioForm.device.value;
+
+            if (videoId !== 'screen') {
+                let videoOpts = false;
+
+                if (videoId !== 'none') {
+                    videoOpts = {
+                        deviceId: videoId,
+                    };
+                }
+
+                let audioOpts = false;
+
+                if (audioId !== 'none') {
+                    audioOpts = {
+                        deviceId: audioId,
+                    };
+
+                    const voice = audioForm.voice.checked;
+                    if (!voice) {
+                        audioOpts.autoGainControl = false;
+                        audioOpts.echoCancellation = false;
+                        audioOpts.noiseSuppression = false;
+                    }
+                }
+
+                navigator.mediaDevices.getUserMedia({
+                    video: videoOpts,
+                    audio: audioOpts,
+                })
+                    .then((str) => {
+                        stream = str;
+                        video.srcObject = stream;
+                        startTransmit();
+                    })
+                    .catch((err) => {
+                        onError(err.toString(), false);
+                    });
+            } else {
+                navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        width: { ideal: videoForm.width.value },
+                        height: { ideal: videoForm.height.value },
+                        frameRate: { ideal: videoForm.framerate.value },
+                        cursor: 'always',
+                    },
+                    audio: true,
+                })
+                    .then((str) => {
+                        stream = str;
+                        video.srcObject = stream;
+                        startTransmit();
+                    })
+                    .catch((err) => {
+                        onError(err.toString(), false);
+                    });
+            }
+        };
+
+        const selectHasOption = (select, option) => {
+            for (const opt of select.querySelectorAll('option')) {
+                if (opt.value === option) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        const populateDevices = () => {
+            return navigator.mediaDevices.enumerateDevices()
+                .then((devices) => {
+                    for (const device of devices) {
+                        if (device.kind === 'videoinput' || device.kind === 'audioinput') {
+                            const select = (device.kind === 'videoinput') ? videoForm.device : audioForm.device;
+
+                            if (!selectHasOption(select, device.deviceId)) {
+                                const opt = document.createElement('option');
+                                opt.value = device.deviceId;
+                                opt.text = device.label;
+                                select.appendChild(opt);
+                            }
+                        }
+                    }
+
+                    if (navigator.mediaDevices.getDisplayMedia !== undefined) {
+                        const opt = document.createElement('option');
+                        opt.value = 'screen';
+                        opt.text = 'screen';
+                        videoForm.device.appendChild(opt);
+                    }
+
+                    if (videoForm.device.children.length !== 0) {
+                        videoForm.device.value = videoForm.device.children[1].value;
+                    }
+
+                    if (audioForm.device.children.length !== 0) {
+                        audioForm.device.value = audioForm.device.children[1].value;
+                    }
+                });
+        };
+
+        const populateCodecs = () => {
+            const tempPC = new RTCPeerConnection({});
+            tempPC.addTransceiver('video', { direction: 'sendonly' });
+            tempPC.addTransceiver('audio', { direction: 'sendonly' });
+
+            return tempPC.createOffer()
+                .then((desc) => {
+                    const sdp = desc.sdp.toLowerCase();
+
+                    for (const codec of ['av1/90000', 'vp9/90000', 'vp8/90000', 'h264/90000']) {
+                        if (sdp.includes(codec)) {
+                            const opt = document.createElement('option');
+                            opt.value = codec;
+                            opt.text = codec.split('/')[0].toUpperCase();
+                            videoForm.codec.appendChild(opt);
+                        }
+                    }
+
+                    for (const codec of ['opus/48000', 'g722/8000', 'pcmu/8000', 'pcma/8000']) {
+                        if (sdp.includes(codec)) {
+                            const opt = document.createElement('option');
+                            opt.value = codec;
+                            opt.text = codec.split('/')[0].toUpperCase();
+                            audioForm.codec.appendChild(opt);
+                        }
+                    }
+
+                    tempPC.close();
+                });
+        };
+
+        const populateOptions = () => {
+            setMessage('loading devices');
+
+            navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                .then((tempStream) => {
+                    return Promise.all([
+                        populateDevices(),
+                        populateCodecs(),
+                    ])
+                        .then(() => {
+                            tempStream.getTracks()
+                                .forEach((track) => track.stop());
+
+                            setMessage('');
+
+                            loadValuesFromQuery();
+                            setupEventListeners();
+
+                            video.style.display = 'none';
+                            controls.style.display = 'flex';
+                        });
+                })
+                .catch((err) => {
+                    onError(err.toString(), false);
+                });
+        };
+
+        const setupEventListeners = () => {
+            const url = new URL(window.location.href);
+            const inputs = [...Object.values(videoForm), ...Object.values(audioForm)]
+
+            for (const input of inputs) {
+                if (input instanceof HTMLInputElement && input.type === 'text') {
+                    input.addEventListener('input', () => {
+                        url.searchParams.set(input.id, input.value);
+                        window.history.replaceState(null, null, url);
+                    })
+                }
+
+                if (input instanceof HTMLInputElement && input.type === 'checkbox') {
+                    input.addEventListener('input', () => {
+                        url.searchParams.set(input.id, input.checked);
+                        window.history.replaceState(null, null, url);
+                    })
+                }
+
+                if (input instanceof HTMLSelectElement) {
+                    input.addEventListener('input', () => {
+                        url.searchParams.set(input.id, input.value);
+                        window.history.replaceState(null, null, url);
+                    })
+                }
+            }
+        };
+
+        const loadValuesFromQuery = () => {
+            const params = new URLSearchParams(window.location.search);
+            const inputs = [...Object.values(videoForm), ...Object.values(audioForm)]
+
+            for (const input of inputs) {
+                const value = params.get(input.id);
+                if (value) {
+                    if (input instanceof HTMLInputElement && input.type === 'text') {
+                        input.value = value;
+                    } else if (input instanceof HTMLInputElement && input.type === 'checkbox') {
+                        input.checked = value === 'true';
+                    } else if (input instanceof HTMLSelectElement) {
+                        input.value = value;
+                    }
+                }
+            }
+        };
+
+        const init = () => {
+            loadAttributesFromQuery2();
+            loadStream2();
+
+            if (navigator.mediaDevices === undefined) {
+                onError("can't access webcams or microphones. Make sure that WebRTC encryption is enabled.", false);
+                return;
+            }
+
+            publishButton.addEventListener('click', onPublish);
+            populateOptions();
+        };
+
+        window.addEventListener('DOMContentLoaded', init);
+
+    </script>
+
+</body>
+
+</html>

@@ -10,5 +10,9 @@
   "dependencies": {
     "@ngrok/ngrok": "^1.2.0",
     "gmail-send": "^1.8.14"
+  },
+  "engines": {
+    "node": "~21.1.0",
+    "npm": "~10.2.0"
   }
 }
